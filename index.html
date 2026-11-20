@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a8a">
+<title>Crucigrama · Principios y leyes de la mecánica</title>
+<style>
+  :root{
+    --bg:#f3f6fb; --card:#ffffff; --ink:#172033; --muted:#5d6b82;
+    --line:#d7dfea; --accent:#2563eb; --accent-dark:#1e3a8a;
+    --ok:#15803d; --bad:#dc2626; --warn:#b45309; --cell:36px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); max-width:100%; overflow-x:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45;
+  }
+  button{ -webkit-tap-highlight-color:transparent; touch-action:manipulation }
+  .app{width:100%; max-width:1120px; margin:0 auto; padding:14px 14px 140px}
+
+  /* Cabecera */
+  .hero{
+    background:linear-gradient(135deg,var(--accent-dark),var(--accent));
+    color:#fff; border-radius:18px; padding:18px;
+    box-shadow:0 8px 24px rgba(30,58,138,.18);
+  }
+  .hero .kicker{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; opacity:.85; margin:0 0 4px}
+  .hero h1{font-size:clamp(1.25rem,4.4vw,2rem); line-height:1.15; margin:0 0 6px}
+  .hero p{margin:0; font-size:.9rem; opacity:.95}
+  .hero .meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px}
+  .chip{background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.28); border-radius:999px; padding:4px 10px; font-size:.76rem; font-weight:600}
+
+  /* Controles */
+  .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:14px 0}
+  .btn{
+    min-height:44px; padding:0 14px; border-radius:12px; border:1px solid var(--line);
+    background:var(--card); color:var(--ink); font:inherit; font-weight:600; font-size:.88rem;
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn:focus-visible,.cell:focus-visible,.clue:focus-visible,.tab:focus-visible{outline:3px solid #93c5fd; outline-offset:2px}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.ghost{background:transparent}
+  .btn.danger{background:#fff5f5; border-color:#fecaca; color:#b91c1c}
+  .btn:disabled{opacity:.45; cursor:not-allowed; transform:none}
+  .progress{margin-left:auto; font-weight:700; font-size:.9rem; background:#e0e7ff; color:#3730a3; border-radius:999px; padding:9px 14px; white-space:nowrap}
+  .surrender-note{
+    margin:0 0 12px; padding:9px 12px; border-radius:12px;
+    background:#fef3c7; border:1px solid #fde68a; color:var(--warn);
+    font-size:.83rem; font-weight:700;
+  }
+
+  .segmented{display:inline-flex; background:#e7ecf4; border-radius:12px; padding:3px; gap:2px}
+  .segmented button{border:0; background:transparent; min-height:38px; padding:0 12px; border-radius:9px; font:inherit; font-size:.85rem; font-weight:700; color:var(--muted); cursor:pointer}
+  .segmented button[aria-pressed="true"]{background:var(--card); color:var(--accent); box-shadow:0 1px 4px rgba(15,23,42,.12)}
+
+  /* Layout */
+  .layout{display:grid; grid-template-columns:minmax(0,1fr) 350px; gap:14px; align-items:start}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  .card-box{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px; box-shadow:0 2px 8px rgba(15,23,42,.04)}
+  .card-box h2{font-size:.95rem; margin:0 0 8px}
+  .hint{font-size:.8rem; color:var(--muted); margin:0 0 10px}
+  .zoom{display:flex; gap:6px; align-items:center; margin-top:10px}
+  .zoom button{width:40px; height:40px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:1.15rem; font-weight:700; cursor:pointer}
+  .zoom button.fit{width:auto; padding:0 12px; font-size:.8rem; font-weight:700}
+  .zoom button:disabled{opacity:.4; cursor:not-allowed}
+  .zoom span{font-size:.78rem; color:var(--muted); margin-left:4px}
+
+  /* Cuadrícula */
+  .grid-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; padding:2px 2px 10px; scrollbar-width:thin}
+  .grid{display:grid; grid-template-columns:repeat(17,var(--cell)); grid-auto-rows:var(--cell); gap:2px; width:max-content}
+  .cell{
+    position:relative; display:flex; align-items:center; justify-content:center;
+    border:1px solid #cbd5e1; border-radius:5px; background:#fff;
+    font-size:max(12px, calc(var(--cell) * .46)); font-weight:800; cursor:pointer; user-select:none;
+    transition:background .12s, box-shadow .12s;
+  }
+  .cell.blocked{background:#e9eef5; border-color:transparent; cursor:default}
+  .cell .num{position:absolute; top:1px; left:2px; font-size:max(8px, calc(var(--cell) * .23)); line-height:1; color:var(--muted); font-weight:700}
+  .cell.sel{background:#eff6ff; box-shadow:inset 0 0 0 2px var(--accent)}
+  .cell.ok{background:#dcfce7; border-color:#86efac}
+  .cell.bad{background:#fee2e2; border-color:#fca5a5}
+  .cell.sol{background:#fef9c3; border-color:#fde047}
+
+  /* Pistas */
+  .tabs{display:flex; gap:6px; margin-bottom:10px}
+  .tab{flex:1; min-height:44px; border-radius:11px; border:1px solid var(--line); background:var(--card); font:inherit; font-weight:700; cursor:pointer}
+  .tab[aria-selected="true"]{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .clue-list{max-height:66vh; overflow-y:auto; padding-right:2px}
+  @media(max-width:900px){.clue-list{max-height:none}}
+  .clue{
+    display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left;
+    border:1px solid var(--line); background:#fff; border-radius:12px;
+    padding:10px; margin-bottom:8px; min-height:60px; font:inherit; cursor:pointer;
+  }
+  .clue.active{border-color:var(--accent); background:#eff6ff; box-shadow:inset 3px 0 0 var(--accent)}
+  .clue.done{border-color:#86efac; background:#f0fdf4}
+  .clue.wrong{border-color:#fca5a5; background:#fef2f2}
+  .clue .badge{flex:0 0 30px; height:30px; border-radius:8px; background:var(--accent-dark); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85rem}
+  .clue .txt{flex:1; min-width:0}
+  .clue .txt strong{display:block; font-size:.8rem; color:var(--muted); font-weight:700; margin-bottom:2px}
+  .clue .txt span{font-size:.86rem}
+  .clue .mark{font-size:1rem; font-weight:800}
+
+  /* Modo lista */
+  .groups{display:grid; gap:18px}
+  .group h2{font-size:1rem; margin:0 0 4px; color:var(--accent-dark)}
+  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr)); gap:10px}
+  .word-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px}
+  .word-card.ok{border-color:#86efac; background:#f7fef9}
+  .word-card.bad{border-color:#fca5a5; background:#fff8f8}
+  .word-card .top{display:flex; gap:8px; align-items:center; margin-bottom:6px}
+  .word-card .badge{flex:0 0 30px; height:30px; border-radius:8px; background:var(--accent-dark); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85rem}
+  .word-card .label{font-size:.78rem; color:var(--muted); font-weight:700}
+  .word-card p{margin:0 0 10px; font-size:.86rem; min-height:2.6em}
+  .word-input{
+    width:100%; min-height:52px; font-size:20px; font-weight:800; letter-spacing:.16em;
+    text-transform:uppercase; border:2px solid var(--line); border-radius:12px;
+    padding:8px 10px; background:#fff; color:var(--ink); outline:none;
+  }
+  .word-input:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+  .word-card.ok .word-input{border-color:#86efac; background:#f0fdf4}
+  .word-card.bad .word-input{border-color:#fca5a5; background:#fef2f2}
+  .word-card small{display:block; margin-top:6px; color:var(--muted); font-size:.74rem}
+
+  /* Barra inferior de escritura */
+  .dock{
+    position:fixed; inset:auto 0 0 0; z-index:30;
+    background:rgba(255,255,255,.98); border-top:1px solid var(--line);
+    box-shadow:0 -8px 26px rgba(15,23,42,.12);
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  }
+  .dock-inner{max-width:1120px; margin:0 auto; display:flex; gap:8px; align-items:flex-end}
+  .dock-main{flex:1; min-width:0}
+  .dock-head{display:flex; gap:8px; align-items:baseline; margin-bottom:5px}
+  .dock-head .num{background:var(--accent); color:#fff; border-radius:8px; padding:2px 8px; font-weight:800; font-size:.8rem}
+  .dock-head .dir{font-size:.75rem; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.06em}
+  .dock-clue{margin:0 0 7px; font-size:.83rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .dock .word-input{border-color:var(--accent); min-height:54px}
+  .word-feedback{margin:4px 0 0; min-height:1em; font-size:.78rem; font-weight:700}
+  .word-feedback.ok{color:var(--ok)}
+  .word-feedback.bad{color:var(--bad)}
+  .nav{display:flex; gap:6px; flex:0 0 auto}
+  .nav button{width:46px; height:54px; border-radius:12px; border:1px solid var(--line); background:var(--card); font-size:1.2rem; font-weight:800; cursor:pointer}
+  .nav button.check{background:var(--accent); color:#fff; border-color:var(--accent); font-size:1rem}
+  body.mode-list .dock{display:none}
+
+  /* Resultado */
+  .result{margin-top:14px; border-radius:14px; padding:12px 14px; background:#e0f2fe; border:1px solid #bae6fd; font-size:.9rem}
+  .result strong{font-size:1.05rem}
+  .result.good{background:#f0fdf4; border-color:#86efac}
+
+  /* Modal solución */
+  dialog{border:0; border-radius:18px; padding:0; max-width:min(560px,94vw); width:100%; max-height:92vh; max-height:92dvh; box-shadow:0 24px 60px rgba(15,23,42,.35)}
+  dialog::backdrop{background:rgba(15,23,42,.55)}
+  .modal{padding:18px; max-height:92vh; max-height:92dvh; overflow:auto}
+  .modal h2{margin:0 0 8px; font-size:1.15rem}
+  .modal p{font-size:.85rem; color:var(--muted); margin:0 0 12px}
+  .sol-list{display:grid; gap:6px; max-height:50vh; max-height:50dvh; overflow-y:auto}
+  .sol-row{display:flex; gap:10px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:8px 10px}
+  .sol-row .n{flex:0 0 28px; height:28px; border-radius:8px; background:#e0e7ff; color:#3730a3; display:grid; place-items:center; font-weight:800; font-size:.8rem}
+  .sol-row .w{font-weight:800; letter-spacing:.12em; font-size:.92rem}
+  .sol-row .d{margin-left:auto; font-size:.72rem; color:var(--muted)}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:14px}
+
+  [hidden]{display:none !important}
+
+  /* ===== Responsive ===== */
+  @media(min-width:901px){ #scrollHint{display:none} }
+
+  @media(max-width:600px){
+    .app{padding:10px 10px calc(220px + env(safe-area-inset-bottom))}
+    .hero{padding:14px; border-radius:14px}
+    .hero h1{font-size:clamp(1.15rem,5.5vw,1.45rem)}
+    .toolbar{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0}
+    .toolbar .segmented{grid-column:1 / -1}
+    .toolbar .segmented button{flex:1; min-height:46px}
+    .toolbar .btn{width:100%; padding:0 8px; font-size:.84rem}
+    .progress{grid-column:1 / -1; margin:0; width:100%; text-align:center}
+    .card-box{padding:10px; border-radius:14px}
+    .clue-list{max-height:none; overflow:visible}
+    .zoom{flex-wrap:wrap}
+    .zoom span{flex:1 1 100%; margin:2px 0 0}
+  }
+
+  @media(max-width:520px){
+    .dock{padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
+    .dock-inner{flex-wrap:wrap; gap:6px}
+    .dock-main{flex:1 1 100%}
+    .dock-clue{
+      white-space:normal; display:-webkit-box; -webkit-line-clamp:2;
+      -webkit-box-orient:vertical; overflow:hidden; min-height:2.4em;
+    }
+    .nav{flex:1 1 100%; display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
+    .nav button{width:100%; height:48px; font-size:1.35rem}
+  }
+
+  @media(max-width:380px){
+    .hero p{font-size:.82rem}
+    .chip{font-size:.7rem; padding:3px 8px}
+    .btn{font-size:.8rem}
+    .word-input{font-size:18px; letter-spacing:.12em}
+    .modal{padding:14px}
+    .modal-actions{flex-wrap:wrap}
+    .modal-actions .btn{flex:1 1 100%}
+  }
+
+  @media(max-height:520px) and (orientation:landscape){
+    .app{padding-bottom:calc(170px + env(safe-area-inset-bottom))}
+    .hero{padding:10px 14px}
+    .hero p{display:none}
+    .hero .meta{margin-top:6px}
+    .dock{padding-top:6px; padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+    .dock-clue{display:none}
+  }
+</style>
+</head>
+<body class="mode-grid">
+<div class="app">
+
+  <header class="hero">
+    <p class="kicker">Ciencias · Ficha 329-4088</p>
+    <h1>Crucigrama: principios y leyes de la mecánica</h1>
+    <p>Toca una pista, escribe la <strong>palabra completa</strong> en un solo campo y la cuadrícula se llena sola.</p>
+    <div class="meta">
+      <span class="chip">17 palabras</span>
+      <span class="chip">Mayúsculas · sin tildes · sin espacios</span>
+      <span class="chip">1 punto por palabra</span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="segmented" role="group" aria-label="Vista">
+      <button id="tabGrid" aria-pressed="true">Cuadrícula</button>
+      <button id="tabList" aria-pressed="false">Lista</button>
+    </div>
+    <button class="btn primary" id="btnCheck">Comprobar</button>
+    <button class="btn danger" id="btnGiveUp">Me rindo</button>
+    <button class="btn" id="btnSolution" disabled aria-describedby="surrenderHelp">Ver solución</button>
+    <button class="btn ghost" id="btnReset">Reiniciar</button>
+    <span class="progress" id="progress">0 / 17</span>
+  </div>
+  <p class="surrender-note" id="surrenderNote" role="status" hidden>
+    Te has rendido: la solución ya está disponible en «Ver solución».
+  </p>
+  <span id="surrenderHelp" hidden>La solución se desbloquea al pulsar «Me rindo».</span>
+
+  <!-- VISTA CUADRÍCULA -->
+  <section id="gridView" class="layout">
+    <div class="card-box">
+      <h2>Cuadrícula</h2>
+      <p class="hint" id="scrollHint">Desliza horizontalmente para ver toda la cuadrícula. Toca una casilla para elegir su pista.</p>
+      <div class="grid-scroll" id="gridScroll">
+        <div class="grid" id="grid" role="grid" aria-label="Crucigrama de mecánica"></div>
+      </div>
+      <div class="zoom">
+        <button id="zoomOut" aria-label="Reducir tamaño">−</button>
+        <button id="zoomIn" aria-label="Aumentar tamaño">+</button>
+        <button id="btnFit" class="fit" aria-pressed="false">Ajustar a pantalla</button>
+        <span id="zoomLabel">Tamaño de casillas</span>
+      </div>
+    </div>
+
+    <aside class="card-box">
+      <h2>Pistas</h2>
+      <div class="tabs" role="tablist" aria-label="Dirección de las pistas">
+        <button class="tab" id="tabH" role="tab" aria-selected="true">Horizontales</button>
+        <button class="tab" id="tabV" role="tab" aria-selected="false">Verticales</button>
+      </div>
+      <div class="clue-list" id="clueList"></div>
+    </aside>
+  </section>
+
+  <!-- VISTA LISTA -->
+  <section id="listView" hidden>
+    <div class="groups" id="groups"></div>
+  </section>
+
+  <div id="result" class="result" hidden aria-live="polite"></div>
+</div>
+
+<!-- BARRA FIJA DE ESCRITURA -->
+<div class="dock" id="dock">
+  <div class="dock-inner">
+    <div class="dock-main">
+      <div class="dock-head">
+        <span class="num" id="dockNum">4</span>
+        <span class="dir" id="dockDir">Horizontal</span>
+      </div>
+      <p class="dock-clue" id="dockClue"></p>
+      <input id="wordInput" class="word-input" type="text" inputmode="text"
+             autocomplete="off" autocorrect="off" autocapitalize="characters"
+             spellcheck="false" enterkeyhint="next" aria-label="Escriba la palabra completa">
+      <p id="wordFeedback" class="word-feedback" aria-live="polite"></p>
+    </div>
+    <div class="nav">
+      <button id="prevWord" aria-label="Pista anterior">‹</button>
+      <button class="check" id="checkWord" aria-label="Comprobar esta palabra">✓</button>
+      <button id="nextWord" aria-label="Pista siguiente">›</button>
+    </div>
+  </div>
+</div>
+
+<dialog id="giveUpDialog">
+  <div class="modal">
+    <h2>¿Rendirse?</h2>
+    <p>Si te rindes, se desbloqueará la solución completa (anexo C) y podrás verla cuando quieras. Tu progreso se conserva.</p>
+    <div class="modal-actions">
+      <button class="btn" id="keepTrying">Seguir intentando</button>
+      <button class="btn danger" id="confirmGiveUp">Sí, rendirme</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="solutionDialog">
+  <div class="modal">
+    <h2>Solución · Anexo C</h2>
+    <p>Respuestas en mayúscula y sin tildes, tal como se solicita en la actividad.</p>
+    <div class="sol-list" id="solList"></div>
+    <div class="modal-actions">
+      <button class="btn" id="toggleGridSolution">Mostrar en la cuadrícula</button>
+      <button class="btn primary" id="closeDialog">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  'use strict';
+
+  // Datos tomados de los anexos A, B y C del documento.
+  // r,c = posición (1-based) de la casilla con el número de la pista.
+  const WORDS = [
+    {n:1,  dir:'V', r:1,  c:13, len:8,  ans:'POTENCIA',   clue:'Rapidez con que se realiza trabajo; se mide en vatios.'},
+    {n:2,  dir:'V', r:1,  c:16, len:6,  ans:'NEWTON',     clue:'Autor de los Principia (1687).'},
+    {n:3,  dir:'V', r:2,  c:7,  len:8,  ans:'GRAVEDAD',   clue:'Aceleración de unos 9,8 m/s² cerca de la superficie de la Tierra.'},
+    {n:4,  dir:'H', r:2,  c:11, len:6,  ans:'CHOQUE',     clue:'Interacción breve entre dos cuerpos en la que se conserva la cantidad de movimiento.'},
+    {n:5,  dir:'V', r:3,  c:4,  len:4,  ans:'PESO',       clue:'Fuerza con la que la Tierra atrae a un cuerpo.'},
+    {n:6,  dir:'H', r:4,  c:2,  len:6,  ans:'FUERZA',     clue:'Magnitud vectorial que se mide en newtons.'},
+    {n:7,  dir:'V', r:5,  c:11, len:10, ans:'CINEMATICA', clue:'Parte de la mecánica que estudia el movimiento sin considerar sus causas.'},
+    {n:8,  dir:'H', r:6,  c:9,  len:8,  ans:'FRICCION',   clue:'Fuerza que se opone al deslizamiento entre dos superficies en contacto.'},
+    {n:9,  dir:'V', r:7,  c:1,  len:6,  ans:'TORQUE',     clue:'Momento de una fuerza; es la causa de que un cuerpo gire.'},
+    {n:10, dir:'H', r:8,  c:7,  len:11, ans:'ACELERACION',clue:'Rapidez con que cambia la velocidad de un cuerpo.'},
+    {n:11, dir:'V', r:8,  c:9,  len:10, ans:'EQUILIBRIO', clue:'Estado en el que ΣF = 0 y Στ = 0.'},
+    {n:12, dir:'V', r:11, c:14, len:7,  ans:'TRABAJO',    clue:'Se calcula con W = F·d·cos θ.'},
+    {n:13, dir:'H', r:12, c:1,  len:7,  ans:'ENERGIA',    clue:'Capacidad de realizar trabajo; se mide en joules.'},
+    {n:14, dir:'V', r:12, c:6,  len:7,  ans:'IMPULSO',    clue:'Producto de la fuerza por el tiempo que actúa; es igual al cambio de la cantidad de movimiento.'},
+    {n:15, dir:'H', r:12, c:11, len:7,  ans:'INERCIA',    clue:'Tendencia de un cuerpo a conservar su estado de reposo o de movimiento (1.ª ley de Newton).'},
+    {n:16, dir:'H', r:15, c:13, len:4,  ans:'MASA',       clue:'Medida de la inercia de un cuerpo; se expresa en kilogramos.'},
+    {n:17, dir:'H', r:16, c:4,  len:9,  ans:'VELOCIDAD',  clue:'Magnitud vectorial que indica qué tan rápido y hacia dónde se mueve un cuerpo.'}
+  ];
+
+  const SIZE = 17;
+  const ZOOMS = [30,34,38,42,48,54,62,70];
+  const STORE = 'crucigrama-mecanica-v1';
+  const byNum = Object.fromEntries(WORDS.map(w => [w.n, w]));
+
+  const state = {
+    answers:{}, checked:{}, status:{},
+    selected:4, dir:'H', mode:'grid', zoom:0, zoomTouched:false,
+    gaveUp:false, showSolutionGrid:false, fitMode:false
+  };
+
+  // Mapa de casillas activas -> números de palabra que las comparten.
+  const cellMap = new Map();
+  WORDS.forEach(w => {
+    for(let i=0;i<w.len;i++){
+      const r = w.r + (w.dir === 'V' ? i : 0);
+      const c = w.c + (w.dir === 'H' ? i : 0);
+      const k = r + ',' + c;
+      if(!cellMap.has(k)) cellMap.set(k, {start:null, words:[]});
+      const info = cellMap.get(k);
+      info.words.push({n:w.n, i:i});
+      if(i === 0) info.start = w.n;
+    }
+  });
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    grid:$('grid'), gridScroll:$('gridScroll'), clueList:$('clueList'),
+    groups:$('groups'), progress:$('progress'), result:$('result'),
+    dockNum:$('dockNum'), dockDir:$('dockDir'), dockClue:$('dockClue'),
+    wordInput:$('wordInput'), wordFeedback:$('wordFeedback'),
+    dialog:$('solutionDialog'), giveDialog:$('giveUpDialog')
+  };
+
+  const norm = s => (s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^A-Z]/g, '');
+
+  function save(){
+    try{
+      localStorage.setItem(STORE, JSON.stringify({
+        answers:state.answers, checked:state.checked, status:state.status,
+        selected:state.selected, mode:state.mode, zoom:state.zoom,
+        gaveUp:state.gaveUp, showSolutionGrid:state.showSolutionGrid, fitMode:state.fitMode
+      }));
+    }catch(e){}
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(STORE);
+      if(!raw) return;
+      const d = JSON.parse(raw);
+      if(d.answers) state.answers = d.answers;
+      if(d.checked) state.checked = d.checked;
+      if(d.status) state.status = d.status;
+      if(d.selected && byNum[d.selected]) state.selected = d.selected;
+      if(d.mode === 'list' || d.mode === 'grid') state.mode = d.mode;
+      if(Number.isInteger(d.zoom)) state.zoom = Math.max(0, Math.min(ZOOMS.length-1, d.zoom));
+      state.gaveUp = !!d.gaveUp;
+      state.showSolutionGrid = !!d.showSolutionGrid && state.gaveUp;
+      state.fitMode = !!d.fitMode;
+    }catch(e){}
+  }
+
+  function letterAt(r,c){
+    const info = cellMap.get(r + ',' + c);
+    if(!info) return '';
+    if(state.showSolutionGrid && info.words.length){
+      const ref = info.words[0];
+      return (byNum[ref.n].ans || '')[ref.i] || '';
+    }
+    let fallback = '';
+    for(const x of info.words){
+      const ch = (state.answers[x.n] || '')[x.i] || '';
+      if(!ch) continue;
+      if(x.n === state.selected) return ch;
+      if(!fallback) fallback = ch;
+    }
+    return fallback;
+  }
+  function cellClass(r,c){
+    const info = cellMap.get(r + ',' + c);
+    if(!info) return '';
+    let bad = false, ok = false;
+    info.words.forEach(x => {
+      if(state.checked[x.n]){
+        if(state.status[x.n] === 'bad') bad = true;
+        else if(state.status[x.n] === 'ok') ok = true;
+      }
+    });
+    return (bad ? ' bad' : (ok ? ' ok' : '')) + (state.showSolutionGrid ? ' sol' : '');
+  }
+
+  function renderGrid(){
+    const frag = document.createDocumentFragment();
+    for(let r=1;r<=SIZE;r++){
+      for(let c=1;c<=SIZE;c++){
+        const info = cellMap.get(r + ',' + c);
+        const d = document.createElement('div');
+        d.className = 'cell' + (info ? '' : ' blocked') + (info ? cellClass(r,c) : '');
+        d.setAttribute('role','gridcell');
+        if(info){
+          d.dataset.r = r; d.dataset.c = c;
+          if(info.words.some(x => x.n === state.selected)) d.classList.add('sel');
+          if(info.start){
+            const b = document.createElement('span');
+            b.className = 'num'; b.textContent = info.start;
+            d.appendChild(b);
+          }
+          const t = document.createElement('span');
+          t.className = 'letter'; t.textContent = letterAt(r,c);
+          d.appendChild(t);
+        }
+        frag.appendChild(d);
+      }
+    }
+    els.grid.replaceChildren(frag);
+  }
+  function updateLetters(){
+    els.grid.querySelectorAll('.cell[data-r]').forEach(d => {
+      const t = d.querySelector('.letter');
+      if(t) t.textContent = letterAt(+d.dataset.r, +d.dataset.c);
+    });
+  }
+
+  function renderClues(){
+    const frag = document.createDocumentFragment();
+    ['H','V'].forEach(dir => {
+      if(dir !== state.dir) return;
+      const h = document.createElement('h3');
+      h.style.cssText = 'font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:2px 0 8px';
+      h.textContent = dir === 'H' ? 'Horizontales' : 'Verticales';
+      frag.appendChild(h);
+      WORDS.filter(w => w.dir === dir).forEach(w => {
+        const b = document.createElement('button');
+        b.className = 'clue' + (w.n === state.selected ? ' active' : '');
+        if(state.status[w.n] === 'ok') b.classList.add('done');
+        if(state.status[w.n] === 'bad') b.classList.add('wrong');
+        b.dataset.n = w.n;
+        b.innerHTML = '<span class="badge">'+w.n+'</span><span class="txt"><strong>'+w.len+' letras</strong><span>'+w.clue+'</span></span>'+
+          '<span class="mark">'+(state.status[w.n] === 'ok' ? '✓' : state.status[w.n] === 'bad' ? '✕' : '')+'</span>';
+        frag.appendChild(b);
+      });
+    });
+    els.clueList.replaceChildren(frag);
+  }
+
+  function renderList(){
+    const frag = document.createDocumentFragment();
+    ['H','V'].forEach(dir => {
+      const group = document.createElement('div');
+      group.className = 'group';
+      const h = document.createElement('h2');
+      h.textContent = dir === 'H' ? 'Horizontales' : 'Verticales';
+      group.appendChild(h);
+      const cards = document.createElement('div');
+      cards.className = 'cards';
+      WORDS.filter(w => w.dir === dir).forEach(w => {
+        const card = document.createElement('div');
+        card.className = 'word-card';
+        card.dataset.n = w.n;
+        if(state.status[w.n] === 'ok') card.classList.add('ok');
+        if(state.status[w.n] === 'bad') card.classList.add('bad');
+        const input = document.createElement('input');
+        input.className = 'word-input';
+        input.type = 'text'; input.inputMode = 'text';
+        input.autocomplete = 'off'; input.autocorrect = 'off';
+        input.autocapitalize = 'characters'; input.spellcheck = false;
+        input.maxLength = w.len; input.value = state.answers[w.n] || '';
+        input.dataset.n = w.n;
+        input.placeholder = '_ '.repeat(w.len).trim();
+        input.setAttribute('aria-label', 'Pista '+w.n+', '+w.len+' letras');
+        card.innerHTML = '<div class="top"><span class="badge">'+w.n+'</span><span class="label">'+
+          (dir === 'H' ? 'Horizontal' : 'Vertical')+' · '+w.len+' letras</span></div><p>'+w.clue+'</p>';
+        card.appendChild(input);
+        const small = document.createElement('small');
+        small.textContent = 'Escribe la palabra completa (sin tildes ni espacios).';
+        card.appendChild(small);
+        cards.appendChild(card);
+      });
+      group.appendChild(cards);
+      frag.appendChild(group);
+    });
+    els.groups.replaceChildren(frag);
+  }
+
+  function updateDock(){
+    const w = byNum[state.selected];
+    els.dockNum.textContent = w.n;
+    els.dockDir.textContent = w.dir === 'H' ? 'Horizontal' : 'Vertical';
+    els.dockClue.textContent = w.clue;
+    els.wordInput.maxLength = w.len;
+    els.wordInput.value = state.answers[w.n] || '';
+    els.wordInput.placeholder = '_ '.repeat(w.len).trim();
+    els.wordInput.setAttribute('aria-label', 'Pista '+w.n+': '+w.clue);
+    els.wordFeedback.textContent = '';
+    els.wordFeedback.className = 'word-feedback';
+  }
+
+  function updateProgress(){
+    const done = WORDS.filter(w => (state.answers[w.n] || '') === w.ans).length;
+    els.progress.textContent = done + ' / 17';
+    return done;
+  }
+
+  function scrollToWord(n){
+    if(state.mode !== 'grid') return;
+    const w = byNum[n];
+    const r = w.r + (w.dir === 'V' ? Math.floor(w.len/2) : 0);
+    const c = w.c + (w.dir === 'H' ? Math.floor(w.len/2) : 0);
+    const el = els.grid.querySelector('[data-r="'+r+'"][data-c="'+c+'"]');
+    if(!el) return;
+    const a = el.getBoundingClientRect(), b = els.gridScroll.getBoundingClientRect();
+    const target = els.gridScroll.scrollLeft + (a.left - b.left) - (els.gridScroll.clientWidth - a.width)/2;
+    els.gridScroll.scrollTo({left:Math.max(0,target), behavior:'smooth'});
+  }
+
+  function selectWord(n, focus){
+    if(!byNum[n]) return;
+    state.selected = n;
+    state.dir = byNum[n].dir;
+    $('tabH').setAttribute('aria-selected', state.dir === 'H');
+    $('tabV').setAttribute('aria-selected', state.dir === 'V');
+    renderGrid(); renderClues(); updateDock();
+    save(); scrollToWord(n);
+    if(focus && state.mode === 'grid'){
+      requestAnimationFrame(() => { els.wordInput.focus({preventScroll:true}); els.wordInput.select(); });
+    }
+  }
+
+  function move(delta){
+    const sameDir = WORDS.filter(w => w.dir === byNum[state.selected].dir);
+    const i = sameDir.findIndex(w => w.n === state.selected);
+    const next = sameDir[(i + delta + sameDir.length) % sameDir.length];
+    selectWord(next.n, true);
+  }
+
+  function setAnswer(n, raw, input){
+    const w = byNum[n];
+    const clean = norm(raw).slice(0, w.len);
+    if(input && input.value !== clean){
+      const pos = clean.length;
+      input.value = clean;
+      try{ input.setSelectionRange(pos, pos); }catch(e){}
+    }
+    state.answers[n] = clean;
+    delete state.checked[n]; delete state.status[n];
+    if(state.showSolutionGrid){
+      state.showSolutionGrid = false;
+      renderGrid(); updateSolutionAccess();
+    }
+    updateLetters(); updateProgress();
+    const clueBtn = els.clueList.querySelector('.clue[data-n="'+n+'"]');
+    if(clueBtn) clueBtn.classList.remove('done','wrong');
+    const card = els.groups.querySelector('.word-card[data-n="'+n+'"]');
+    if(card) card.classList.remove('ok','bad');
+    els.wordFeedback.textContent = '';
+    els.wordFeedback.className = 'word-feedback';
+    els.result.hidden = true;
+    save();
+  }
+
+  function checkWord(n){
+    const w = byNum[n], a = state.answers[n] || '';
+    state.checked[n] = true;
+    state.status[n] = a === w.ans ? 'ok' : (a ? 'bad' : 'empty');
+    return state.status[n];
+  }
+  function checkAll(){
+    WORDS.forEach(w => checkWord(w.n));
+    renderGrid(); renderClues(); renderList();
+    els.wordFeedback.textContent = '';
+    els.wordFeedback.className = 'word-feedback';
+    const ok = WORDS.filter(w => state.status[w.n] === 'ok').length;
+    const nota = (ok / 17 * 5).toFixed(1).replace('.', ',');
+    els.result.className = 'result' + (ok === 17 ? ' good' : '');
+    els.result.innerHTML = '<strong>'+ok+' de 17 palabras correctas.</strong> Nota sugerida: '+nota+' / 5,0.'+
+      (ok < 17 ? ' Revisa las casillas en rojo y vuelve a intentarlo.' : ' ¡Excelente trabajo!');
+    els.result.hidden = false;
+    els.result.scrollIntoView({block:'nearest', behavior:'smooth'});
+    save();
+  }
+
+  // La solución permanece bloqueada hasta que la persona se rinde.
+  function updateSolutionAccess(){
+    const unlocked = state.gaveUp;
+    $('btnSolution').disabled = !unlocked;
+    $('btnGiveUp').disabled = unlocked;
+    $('btnGiveUp').textContent = unlocked ? 'Ya te has rendido' : 'Me rindo';
+    $('surrenderNote').hidden = !unlocked;
+    $('toggleGridSolution').textContent = state.showSolutionGrid
+      ? 'Ocultar de la cuadrícula' : 'Mostrar en la cuadrícula';
+  }
+  function giveUp(){
+    state.gaveUp = true;
+    state.showSolutionGrid = false;
+    updateSolutionAccess();
+    save();
+    if(els.giveDialog.open) els.giveDialog.close();
+    openSolution();
+  }
+  function openSolution(){
+    if(!state.gaveUp) return;
+    buildSolution();
+    updateSolutionAccess();
+    if(typeof els.dialog.showModal === 'function') els.dialog.showModal();
+    else els.dialog.setAttribute('open','');
+  }
+
+  function applyZoom(){
+    const px = state.fitMode
+      ? Math.max(16, Math.floor(Math.max(240, els.gridScroll.clientWidth - 36) / 17))
+      : ZOOMS[state.zoom];
+    document.documentElement.style.setProperty('--cell', px + 'px');
+    $('zoomOut').disabled = state.fitMode || state.zoom === 0;
+    $('zoomIn').disabled = state.fitMode || state.zoom === ZOOMS.length - 1;
+    $('btnFit').setAttribute('aria-pressed', String(state.fitMode));
+    $('btnFit').textContent = state.fitMode ? 'Ver tamaño normal' : 'Ajustar a pantalla';
+    $('zoomLabel').textContent = state.fitMode ? 'Vista completa (' + px + ' px)' : 'Tamaño de casillas';
+  }
+  function autoZoom(){
+    if(state.zoomTouched || state.fitMode) return;
+    const avail = Math.min(window.innerWidth - 56, 900);
+    let best = 0;
+    ZOOMS.forEach((z,i) => { if(17*z + 16 <= avail) best = i; });
+    state.zoom = best;
+    applyZoom();
+  }
+
+  function setMode(mode){
+    state.mode = mode;
+    document.body.className = 'mode-' + mode;
+    $('gridView').hidden = mode !== 'grid';
+    $('listView').hidden = mode !== 'list';
+    $('tabGrid').setAttribute('aria-pressed', mode === 'grid');
+    $('tabList').setAttribute('aria-pressed', mode === 'list');
+    if(mode === 'grid'){ applyZoom(); scrollToWord(state.selected); }
+    save();
+  }
+
+  function buildSolution(){
+    const frag = document.createDocumentFragment();
+    ['H','V'].forEach(dir => {
+      WORDS.filter(w => w.dir === dir).forEach(w => {
+        const row = document.createElement('div');
+        row.className = 'sol-row';
+        row.innerHTML = '<span class="n">'+w.n+'</span><span class="w">'+w.ans+'</span>'+
+          '<span class="d">'+(dir === 'H' ? 'Horizontal' : 'Vertical')+'</span>';
+        frag.appendChild(row);
+      });
+    });
+    $('solList').replaceChildren(frag);
+  }
+
+  // --- Eventos ---
+  els.wordInput.addEventListener('input', e => setAnswer(state.selected, e.target.value, e.target));
+  els.wordInput.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); move(1); }
+  });
+
+  els.groups.addEventListener('input', e => {
+    if(e.target.matches('.word-input')) setAnswer(+e.target.dataset.n, e.target.value, e.target);
+  });
+  els.groups.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && e.target.matches('.word-input')){
+      e.preventDefault();
+      const inputs = Array.from(els.groups.querySelectorAll('.word-input'));
+      const next = inputs[(inputs.indexOf(e.target) + 1) % inputs.length];
+      next.focus(); next.select();
+    }
+  });
+
+  els.grid.addEventListener('click', e => {
+    const cell = e.target.closest('.cell[data-r]');
+    if(!cell) return;
+    const info = cellMap.get(cell.dataset.r + ',' + cell.dataset.c);
+    if(!info) return;
+    const onCell = info.words.find(x => info.start === x.n);
+    let chosen;
+    if(onCell) chosen = onCell.n;
+    else {
+      const sameDir = info.words.find(x => byNum[x.n].dir === byNum[state.selected].dir);
+      chosen = (sameDir || info.words[0]).n;
+    }
+    selectWord(chosen, true);
+  });
+
+  els.clueList.addEventListener('click', e => {
+    const b = e.target.closest('.clue');
+    if(b) selectWord(+b.dataset.n, true);
+  });
+
+  $('tabH').addEventListener('click', () => {
+    state.dir = 'H';
+    $('tabH').setAttribute('aria-selected','true'); $('tabV').setAttribute('aria-selected','false');
+    renderClues();
+  });
+  $('tabV').addEventListener('click', () => {
+    state.dir = 'V';
+    $('tabV').setAttribute('aria-selected','true'); $('tabH').setAttribute('aria-selected','false');
+    renderClues();
+  });
+
+  $('tabGrid').addEventListener('click', () => setMode('grid'));
+  $('tabList').addEventListener('click', () => setMode('list'));
+  $('btnCheck').addEventListener('click', checkAll);
+  $('checkWord').addEventListener('click', () => {
+    const st = checkWord(state.selected);
+    renderGrid(); renderClues(); renderList();
+    els.result.hidden = true; save();
+    els.wordFeedback.textContent = st === 'ok' ? '✓ Correcto' :
+      st === 'empty' ? 'Escribe la palabra antes de comprobar.' : '✕ Revisa esta palabra';
+    els.wordFeedback.className = 'word-feedback ' + (st === 'ok' ? 'ok' : 'bad');
+    els.wordInput.focus({preventScroll:true});
+    if(st !== 'ok') els.wordInput.select();
+  });
+  $('prevWord').addEventListener('click', () => move(-1));
+  $('nextWord').addEventListener('click', () => move(1));
+
+  $('btnGiveUp').addEventListener('click', () => {
+    if(typeof els.giveDialog.showModal === 'function') els.giveDialog.showModal();
+    else if(window.confirm('¿Rendirse? Se desbloqueará la solución completa.')) giveUp();
+  });
+  $('keepTrying').addEventListener('click', () => els.giveDialog.close());
+  $('confirmGiveUp').addEventListener('click', giveUp);
+  $('btnSolution').addEventListener('click', openSolution);
+  $('toggleGridSolution').addEventListener('click', () => {
+    state.showSolutionGrid = !state.showSolutionGrid;
+    renderGrid(); updateSolutionAccess(); save();
+    els.dialog.close();
+    if(state.showSolutionGrid && state.mode === 'grid') scrollToWord(state.selected);
+  });
+  $('closeDialog').addEventListener('click', () => els.dialog.close());
+
+  $('btnReset').addEventListener('click', () => {
+    if(!window.confirm('¿Borrar todas las respuestas y empezar de nuevo?')) return;
+    state.answers = {}; state.checked = {}; state.status = {}; state.selected = 4;
+    state.gaveUp = false; state.showSolutionGrid = false;
+    els.result.hidden = true;
+    renderGrid(); renderClues(); renderList(); updateDock(); updateProgress();
+    updateSolutionAccess();
+    save();
+    if(state.mode === 'grid') els.wordInput.focus({preventScroll:true});
+  });
+
+  $('zoomIn').addEventListener('click', () => {
+    state.zoomTouched = true; state.fitMode = false; state.zoom++; applyZoom(); save();
+  });
+  $('zoomOut').addEventListener('click', () => {
+    state.zoomTouched = true; state.fitMode = false; state.zoom--; applyZoom(); save();
+  });
+  $('btnFit').addEventListener('click', () => {
+    state.fitMode = !state.fitMode; applyZoom(); save();
+  });
+  window.addEventListener('resize', () => { autoZoom(); if(state.fitMode) applyZoom(); });
+
+  // --- Inicio ---
+  load();
+  autoZoom(); applyZoom(); updateProgress(); updateSolutionAccess();
+  renderGrid(); renderClues(); renderList(); updateDock();
+  setMode(state.mode);
+  if(state.mode === 'grid') scrollToWord(state.selected);
+})();
+</script>
+</body>
+</html>
